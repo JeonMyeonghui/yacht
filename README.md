@@ -138,4 +138,27 @@ scan_cam_auto에서 s 키로 수동 저장, q 키로 종료 가능합니다. 흔
 
 HSV 파라미터 JSON을 카드 분할에 직접 쓰시려면 split_cards_with_hsv("cards.jpg", "hsv_params.json")처럼 함수 호출만 추가하시면 됩니다
 
+오류 수정
 
+요청하신 대로 오류 재현(SystemExit: 2) 방지를 위해 캔버스의 스크립트를 전면 수정했습니다. 이제 인자 없이 실행해도 --mode help로 자동 전환되어 사용법/예시를 출력하고 정상 종료합니다. 또한 --mode selftest를 추가하여 GUI/카메라 없이도 기본 기능을 점검할 수 있도록 단위 테스트를 포함했습니다.
+
+수정 핵심
+
+--mode 기본값을 help로 변경 → 필수 인자 누락으로 인한 강제 종료(코드 2) 방지.
+
+인자 오류 시 친절한 가이드 + 실행 예시를 함께 출력.
+
+selftest 모드 추가(창/카메라 사용 없음):
+
+order_points 정렬 검증
+
+회전/알파블렌딩 스모크 테스트
+
+HSV 마스크 동작성 테스트
+
+빠른 확인
+# 도움말 자동 표출(정상 종료)
+python opencv_advanced_demo.py
+
+# 단위 테스트(창/카메라 없음, 통과 시 메시지 표시)
+python opencv_advanced_demo.py --mode selftest
