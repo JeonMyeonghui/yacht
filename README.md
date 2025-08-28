@@ -58,3 +58,44 @@ face_rot는 눈 두 개가 검출될 때 각도를 계산합니다. 조명이 �
 캐릭터 PNG는 알파 채널이 있는 것을 권장합니다(투명 배경).
 
 문서/카드 검출 실패 시: 해상도↑, 배경 대비↑, Canny 튜너로 적정 임계값을 먼저 찾은 뒤 적용하십시오
+
+
+업그레이드 버전을 캔버스에 올려 두었습니다.
+파일명: opencv_advanced_demo.py (미디어파이프 랜드마크 정밀 오버레이 + HSV/파이프라인 튜너 포함)
+
+설치
+pip install opencv-python numpy mediapipe
+
+바로 실행 예시
+
+랜드마크 정밀 오버레이(카메라 0번, PNG 필요):
+
+python opencv_advanced_demo.py --mode face_landmark --source 0 --overlay character.png
+
+
+HSV 마스크 튜너(설정 저장까지):
+
+python opencv_advanced_demo.py --mode hsv_tuner --image cards.jpg --save hsv_params.json
+
+
+전처리 파이프라인 튜너(문서/카드용):
+
+python opencv_advanced_demo.py --mode pipeline_tuner --image doc.jpg
+
+
+문서 스캔(투시보정):
+
+python opencv_advanced_demo.py --mode scan --image doc.jpg --out scanned.png
+
+
+카드 자동 분할·저장:
+
+python opencv_advanced_demo.py --mode cards_auto --image cards.jpg
+
+사용 팁
+
+face_landmark는 눈 좌표로 각도와 스케일을 자동 보정합니다. 조명 밝게, 얼굴 정면에서 효과가 좋습니다.
+
+hsv_tuner 창에서 s 키로 파라미터를 JSON 저장합니다(마스크 자동화에 활용).
+
+pipeline_tuner는 블러/캐니/모폴로지/적응 임계값을 실시간 미리보기로 튜닝해 최적값을 찾는 용도입니다
