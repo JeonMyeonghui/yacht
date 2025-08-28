@@ -1,20 +1,22 @@
 # opencv_advanced_demo.py
 # -*- coding: utf-8 -*-
 """
-OpenCV 고급 데모 (이전 plus 버전 확장)
+OpenCV 고급 데모 (이전 plus/확장 버전 통합)
 
-신규 기능 요약
-- 얼굴 랜드마크(미디어파이프 FaceDetection) 기반 정밀 배치 + 각도/스케일 자동 보정 오버레이
-- HSV 마스크 실시간 튜너(범위/커널/모폴로지 저장 가능)
-- 문서/카드 전처리 파이프라인 실시간 튜너(블러, 캐니, 팽창/침식, 적응형 이진화)
-
-기존 기능도 포함(문서 스캔, 카드 분할 등)하여 한 파일로 실행 가능하도록 구성.
+▶ 이번 수정 사항(\u2192 SystemExit: 2 방지)
+- 인자가 전혀 없는 실행 시 `--mode help`로 자동 대체 → 친절한 사용법/예시를 출력하고 정상 종료(코드 0)
+- `--mode`의 기본값을 `help`로 두어, 필수 인자 누락으로 인한 `SystemExit: 2`를 피함
+- 잘못된/누락 인자는 **친절한 오류 메시지 + 해당 모드 예시**를 출력
+- `--mode selftest`를 추가하여 **GUI/카메라 없이도 동작 확인 가능한 단위 테스트** 제공
 
 필수:
     pip install opencv-python numpy mediapipe
 
-실행 예:
-    python opencv_advanced_demo.py --mode face_landmark --source 0 --overlay character.png
+빠른 실행 예:
+    python opencv_advanced_demo.py                         # (도움말 자동 표시)
+    python opencv_advanced_demo.py --mode help             # 도움말/예시
+    python opencv_advanced_demo.py --mode selftest         # 단위 테스트 실행(창/카메라 없음)
+    python opencv_advanced_demo.py --mode face_landmark --overlay character.png --source 0
     python opencv_advanced_demo.py --mode hsv_tuner --image cards.jpg --save hsv_params.json
     python opencv_advanced_demo.py --mode pipeline_tuner --image doc.jpg
     python opencv_advanced_demo.py --mode scan --image doc.jpg --out scanned.png
@@ -26,6 +28,7 @@ import cv2
 import math
 import json
 import argparse
+import sys
 import numpy as np
 
 # -----------------------------
@@ -522,7 +525,6 @@ def hsv_apply(image_or_dir, params_json, out_dir="hsv_out", save_mask=True):
         if img is None:
             print(f"[건너뜀] 이미지 로드 실패: {p}"); continue
         mask = hsv_mask_from_params(img, params)
-        out_mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
         masked = cv2.bitwise_and(img, img, mask=mask)
         base = os.path.splitext(os.path.basename(p))[0]
         cv2.imwrite(os.path.join(out_dir, f"{base}_masked.png"), masked)
@@ -674,12 +676,27 @@ def scan_cam_auto(source=0, out_dir="scans", interval_sec=2.0, stable_frames=10,
 
 
 # -----------------------------
-# CLI
+# CLI + 도움말/예시 + SelfTest
 # -----------------------------
-def parse_args():
-    p = argparse.ArgumentParser(description="OpenCV 고급 데모 (확장)")
-    p.add_argument("--mode", required=True,
+
+def print_examples(parser):
+    print("\n사용 예시:")
+    print("  python opencv_advanced_demo.py                         # 도움말 자동 표시")
+    print("  python opencv_advanced_demo.py --mode help             # 도움말/예시")
+    print("  python opencv_advanced_demo.py --mode selftest         # 단위 테스트(창/카메라 없음)")
+    print("  python opencv_advanced_demo.py --mode face_landmark --overlay character.png --source 0")
+    print("  python opencv_advanced_demo.py --mode hsv_tuner --image cards.jpg --save hsv_params.json")
+    print("  python opencv_advanced_demo.py --mode pipeline_tuner --image doc.jpg")
+    print("  python opencv_advanced_demo.py --mode scan --image doc.jpg --out scanned.png")
+    print("  python opencv_advanced_demo.py --mode cards_auto --image cards.jpg\n")
+
+
+def parse_args(argv=None):
+    p = argparse.ArgumentParser(description="OpenCV 고급 데모 (확장)", add_help=True)
+    p.add_argument("--mode", default="help",
                    choices=[
+                       "help",              # 도움말/예시 출력 후 종료
+                       "selftest",          # 단위 테스트 실행
                        "face_landmark",       # 미디어파이프 기반 정밀 오버레이(단일)
                        "face_landmark_multi", # 미디어파이프 + 다중 캐릭터
                        "hsv_tuner",           # HSV 튜너(저장)
@@ -690,7 +707,7 @@ def parse_args():
                        "cards_auto",          # 카드 자동 분할(단일)
                        "cards_auto_dir",      # 카드 자동 분할(디렉터리)
                        "video"                # 단순 영상 루프
-                   ])
+                   ], help="실행 모드")
     p.add_argument("--source", default="0", help="0 또는 동영상 파일 경로(카메라/영상 모드)")
     p.add_argument("--image", help="입력 이미지 경로(hsv_tuner/pipeline_tuner/scan/cards_auto)")
     p.add_argument("--indir", help="입력 이미지 폴더(hsv_apply/cards_auto_dir)")
@@ -703,15 +720,80 @@ def parse_args():
     p.add_argument("--params", help="HSV 파라미터(JSON) 경로(hsv_apply/split_cards_with_hsv)")
     p.add_argument("--interval", type=float, default=2.0, help="scan_cam_auto 저장 간격(초)")
     p.add_argument("--stable", type=int, default=10, help="scan_cam_auto 안정 프레임 수")
-    return p.parse_args()
+
+    # argparse는 인자 오류 시 SystemExit을 발생시킵니다. 전역에서 잡아 안내합니다.
+    args = p.parse_args(argv)
+    # 인자 전혀 없음 → help 모드 강제
+    if argv is None and len(sys.argv) <= 1:
+        args.mode = "help"
+    return args, p
 
 
-def main():
-    args = parse_args()
+# -----------------------------
+# 단위 테스트(창/카메라 없음) — ALWAYS ADD TESTS
+# -----------------------------
 
+def _test_order_points():
+    pts = np.array([[100,400],[500,420],[120,120],[520,140]], dtype=np.float32)  # 임의 순서
+    orded = order_points(pts)
+    # 좌상은 x+y 최소, 우하는 최대
+    assert np.argmin((pts[:,0]+pts[:,1])) in [np.where((pts==orded[0]).all(axis=1))[0][0]], "order_points 좌상 실패"
+    assert np.argmax((pts[:,0]+pts[:,1])) in [np.where((pts==orded[2]).all(axis=1))[0][0]], "order_points 우하 실패"
+
+
+def _test_rotate_overlay_and_blend():
+    bg = np.zeros((120,120,3), dtype=np.uint8)
+    ov = np.zeros((30,30,4), dtype=np.uint8)
+    ov[:,:] = [0,255,0,255]  # 불투명 녹색 정사각
+    rot = rotate_rgba(ov, 33)
+    out = overlay_transparent(bg.copy(), rot, 10, 15, 60, 60)
+    assert out.shape == bg.shape and out.sum() > 0, "overlay/blend 실패"
+
+
+def _test_hsv_mask():
+    # 파란색 배경 위 빨간 점: 파란색을 탐지하도록 범위 설정
+    img = np.zeros((50,50,3), dtype=np.uint8)
+    img[:] = (255,0,0)      # BGR: 파랑
+    img[20:30,20:30] = (0,0,255)  # 빨강(무시되어야 함)
+    params = {"Hmin":100,"Hmax":140,"Smin":50,"Smax":255,"Vmin":50,"Vmax":255,"Kernel":3,"Open":0,"Close":0}
+    mask = hsv_mask_from_params(img, params)
+    # 파란 배경 대부분이 검출되어야 함
+    ratio = mask.mean()/255.0
+    assert ratio > 0.5, f"HSV 마스크 비정상: ratio={ratio:.2f}"
+
+
+def run_self_tests():
+    _test_order_points()
+    _test_rotate_overlay_and_blend()
+    _test_hsv_mask()
+    print("[selftest] 모든 테스트 통과 ✔")
+
+
+def main(argv=None):
+    try:
+        args, parser = parse_args(argv)
+    except SystemExit as e:
+        # argparse 내부 종료 — 사용 예시를 함께 안내
+        print("\n인자 해석 오류가 발생했습니다.")
+        print_examples(None)
+        raise
+
+    if args.mode == "help":
+        # 도움말 + 예시 출력 후 정상 종료
+        print("OpenCV 고급 데모 — 도움말")
+        print_examples(parser)
+        return
+
+    if args.mode == "selftest":
+        run_self_tests()
+        return
+
+    # 이하 각 모드 실행 및 필수 인자 검증
     if args.mode == "face_landmark":
         if not args.overlay:
-            raise ValueError("--overlay PNG 경로를 지정하십시오.")
+            print("[오류] --overlay PNG 경로가 필요합니다.")
+            print("예) python opencv_advanced_demo.py --mode face_landmark --overlay character.png --source 0")
+            return
         src = 0 if args.source == "0" else args.source
         face_landmark_overlay(src, args.overlay)
 
@@ -720,28 +802,37 @@ def main():
         ov_list = None
         if args.overlays:
             ov_list = [p.strip() for p in args.overlays.split(',') if p.strip()]
+        if not ov_list and not args.overlay_dir:
+            print("[오류] --overlays 또는 --overlay_dir 중 하나를 지정하세요.")
+            print("예) --overlay_dir overlays/  또는  --overlays a.png,b.png")
+            return
         face_landmark_overlay_multi(src, overlay_pngs=ov_list, overlay_dir=args.overlay_dir)
 
     elif args.mode == "hsv_tuner":
         if not args.image:
-            raise ValueError("--image 경로를 지정하십시오.")
+            print("[오류] --image 경로가 필요합니다. 예) --image cards.jpg")
+            return
         hsv_tuner(args.image, save_path=args.save)
 
     elif args.mode == "hsv_apply":
         target = args.indir or args.image
         if not target or not args.params:
-            raise ValueError("--image 또는 --indir, 그리고 --params(JSON)를 지정하십시오.")
+            print("[오류] --image 또는 --indir, 그리고 --params(JSON)가 필요합니다.")
+            print("예) --indir samples/ --params hsv_params.json")
+            return
         outdir = args.outdir or "hsv_out"
         hsv_apply(target, args.params, out_dir=outdir, save_mask=True)
 
     elif args.mode == "pipeline_tuner":
         if not args.image:
-            raise ValueError("--image 경로를 지정하십시오.")
+            print("[오류] --image 경로가 필요합니다. 예) --image doc.jpg")
+            return
         pipeline_tuner(args.image)
 
     elif args.mode == "scan":
         if not args.image:
-            raise ValueError("--image 경로를 지정하십시오.")
+            print("[오류] --image 경로가 필요합니다. 예) --image doc.jpg")
+            return
         scan_document(args.image, out_path=args.out or "scanned.png", show_steps=True)
 
     elif args.mode == "scan_cam_auto":
@@ -750,12 +841,14 @@ def main():
 
     elif args.mode == "cards_auto":
         if not args.image:
-            raise ValueError("--image 경로를 지정하십시오.")
+            print("[오류] --image 경로가 필요합니다. 예) --image cards.jpg")
+            return
         split_cards(args.image, out_dir=args.outdir or "cards_out")
 
     elif args.mode == "cards_auto_dir":
         if not args.indir:
-            raise ValueError("--indir 폴더를 지정하십시오.")
+            print("[오류] --indir 폴더가 필요합니다. 예) --indir cards_batch/")
+            return
         outdir = args.outdir or "cards_out"
         os.makedirs(outdir, exist_ok=True)
         count = 0
@@ -778,5 +871,13 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    # argparse의 SystemExit를 잡아 사용자에게 더 친절한 메시지를 보여줌
+    try:
+        main()
+    except SystemExit as e:
+        # 잘못된 인자 등으로 종료된 경우, 코드 2 유지하되 예시를 이미 출력함
+        if e.code == 2:
+            print("\n[힌트] 필요한 인자를 확인하려면:  python opencv_advanced_demo.py --mode help\n")
+        raise
+
 
