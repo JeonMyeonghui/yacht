@@ -99,3 +99,43 @@ face_landmark는 눈 좌표로 각도와 스케일을 자동 보정합니다. �
 hsv_tuner 창에서 s 키로 파라미터를 JSON 저장합니다(마스크 자동화에 활용).
 
 pipeline_tuner는 블러/캐니/모폴로지/적응 임계값을 실시간 미리보기로 튜닝해 최적값을 찾는 용도입니다
+
+업그레이드 완료했습니다. 캔버스의 opencv_advanced_demo.py에 아래 신규 모드가 추가되어 있습니다.
+
+새 기능 요약
+
+face_landmark_multi : 여러 PNG(폴더/목록)로 다중 얼굴에 서로 다른 캐릭터 자동 배정.
+
+hsv_apply : 저장한 HSV 파라미터(JSON) 를 이미지/폴더에 일괄 적용하여 *_masked.png/*_mask.png 생성.
+
+split_cards_with_hsv 함수 : HSV 마스크로 전처리 후 카드 분할 정밀도 향상(필요 시 직접 호출).
+
+scan_cam_auto : 웹캠에서 문서 사각형이 안정적으로 인식되면 자동 저장(간격/안정 프레임 수 조절).
+
+cards_auto_dir : 폴더 내 이미지들을 일괄 카드 분할하여 이미지별 하위 폴더로 저장.
+
+바로 실행 예시
+# 1) 다중 얼굴-캐릭터
+python opencv_advanced_demo.py --mode face_landmark_multi --source 0 --overlay_dir overlays/
+
+# 2) HSV 적용(폴더 전체, JSON은 hsv_tuner에서 저장한 파일)
+python opencv_advanced_demo.py --mode hsv_apply --indir samples/ --params hsv_params.json --outdir hsv_out/
+
+# 3) HSV 적용(단일 파일)
+python opencv_advanced_demo.py --mode hsv_apply --image cards.jpg --params hsv_params.json
+
+# 4) 실시간 문서 스캔 자동 저장(2초 간격, 10프레임 안정 필요)
+python opencv_advanced_demo.py --mode scan_cam_auto --source 0 --outdir scans --interval 2.0 --stable 10
+
+# 5) 카드 분할(폴더 일괄)
+python opencv_advanced_demo.py --mode cards_auto_dir --indir cards_batch/ --outdir cards_out/
+
+팁
+
+face_landmark_multi는 좌→우 얼굴 순서대로 PNG를 순환 배정합니다. 특정 매핑이 필요하시면 규칙을 알려주십시오.
+
+scan_cam_auto에서 s 키로 수동 저장, q 키로 종료 가능합니다. 흔들림이 크면 --stable을 높이거나 --interval을 늘려 주세요.
+
+HSV 파라미터 JSON을 카드 분할에 직접 쓰시려면 split_cards_with_hsv("cards.jpg", "hsv_params.json")처럼 함수 호출만 추가하시면 됩니다
+
+
